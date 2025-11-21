@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>シンプル格闘ゲーム</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="page">
+    <header>
+      <h1>シンプル格闘ゲーム</h1>
+      <p>WASD と ← → ↑ キーで動かし、J / 1 で攻撃、K / 2 でブロック。</p>
+    </header>
+    <main>
+      <section class="hud">
+        <div class="player-hud">
+          <h2>プレイヤー1</h2>
+          <div class="bar">
+            <div id="p1-health" class="health"></div>
+          </div>
+          <div class="bar stamina-bar">
+            <div id="p1-stamina" class="stamina"></div>
+          </div>
+        </div>
+        <div class="player-hud">
+          <h2>プレイヤー2</h2>
+          <div class="bar">
+            <div id="p2-health" class="health"></div>
+          </div>
+          <div class="bar stamina-bar">
+            <div id="p2-stamina" class="stamina"></div>
+          </div>
+        </div>
+        <div class="round-info">
+          <div id="round-text">Round 1</div>
+          <button id="reset">リセット</button>
+        </div>
+      </section>
+
+      <canvas id="arena" width="960" height="520"></canvas>
+      <section class="guide">
+        <h3>操作説明</h3>
+        <div class="controls">
+          <div>
+            <h4>プレイヤー1</h4>
+            <ul>
+              <li>移動: A / D</li>
+              <li>ジャンプ: W</li>
+              <li>攻撃: J</li>
+              <li>防御: K</li>
+            </ul>
+          </div>
+          <div>
+            <h4>プレイヤー2</h4>
+            <ul>
+              <li>移動: ← / →</li>
+              <li>ジャンプ: ↑</li>
+              <li>攻撃: 数字キー 1</li>
+              <li>防御: 数字キー 2</li>
+            </ul>
+          </div>
+        </div>
+        <p>体力が0になるとダウン。スタミナが切れると攻撃力が落ちるので、ブロックでやり過ごして回復しよう。</p>
+      </section>
+    </main>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
