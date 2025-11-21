@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>インベーダーゲーム</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #0a0d14;
+      --panel: #111827;
+      --text: #e5e7eb;
+      --accent: #22d3ee;
+      --muted: #9ca3af;
+      font-family: "SF Pro JP", "Helvetica Neue", Arial, "Noto Sans JP", sans-serif;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at 20% 20%, #111827 0, #0a0d14 40%, #030712 100%);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+
+    .frame {
+      background: var(--panel);
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      padding: 16px;
+      max-width: 720px;
+      width: 100%;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      gap: 12px;
+    }
+
+    h1 {
+      font-size: 20px;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    h1 span {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 8px;
+      background: rgba(34, 211, 238, 0.12);
+      color: var(--accent);
+      font-size: 12px;
+      letter-spacing: 0.05em;
+    }
+
+    .help {
+      font-size: 13px;
+      color: var(--muted);
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    canvas {
+      width: 100%;
+      height: auto;
+      background: #05070d;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      image-rendering: pixelated;
+      display: block;
+    }
+
+    .status {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 10px;
+      background: rgba(34, 211, 238, 0.12);
+      color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <header>
+      <h1>ドットインベーダー <span>ARCADE</span></h1>
+      <div class="badge">← → で移動 / Space でショット</div>
+    </header>
+    <canvas id="game" width="640" height="720" aria-label="インベーダーゲーム"></canvas>
+    <div class="status">
+      <p class="help">Enter でリスタート。すべてのインベーダーを倒すと勝利、地面に到達されると敗北。</p>
+      <div id="score" aria-live="polite">SCORE: 0</div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+    const scoreLabel = document.getElementById("score");
+
+    const state = {
+      player: { x: canvas.width / 2 - 20, y: canvas.height - 70, w: 40, h: 18, speed: 5 },
+      bullets: [],
+      aliens: [],
+      alienDir: 1,
+      alienSpeed: 0.6,
+      lastShot: 0,
+      gameOver: false,
+      win: false,
+      lastFrame: performance.now(),
+      score: 0,
+    };
+
+    const colors = {
+      player: "#22d3ee",
+      bullet: "#fbbf24",
+      alien: "#a78bfa",
+      bgStars: "#0b1220",
+      text: "#e5e7eb",
+    };
+
+    const keys = new Set();
+
+    function createAliens() {
+      const rows = 5;
+      const cols = 9;
+      const spacingX = 60;
+      const spacingY = 50;
+      const offsetX = 60;
+      const offsetY = 60;
+
+      state.aliens = [];
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          state.aliens.push({
+            x: offsetX + col * spacingX,
+            y: offsetY + row * spacingY,
+            w: 36,
+            h: 24,
+            alive: true,
+          });
+        }
+      }
+    }
+
+    function resetGame() {
+      state.player.x = canvas.width / 2 - state.player.w / 2;
+      state.bullets = [];
+      state.alienDir = 1;
+      state.alienSpeed = 0.6;
+      state.lastShot = 0;
+      state.gameOver = false;
+      state.win = false;
+      state.score = 0;
+      createAliens();
+      updateScore();
+    }
+
+    function updateScore() {
+      scoreLabel.textContent = `SCORE: ${state.score}`;
+    }
+
+    function drawPlayer() {
+      ctx.fillStyle = colors.player;
+      const { x, y, w, h } = state.player;
+      ctx.fillRect(x, y, w, h);
+      ctx.fillRect(x + w * 0.35, y - 8, w * 0.3, 8);
+    }
+
+    function drawAliens() {
+      ctx.fillStyle = colors.alien;
+      for (const alien of state.aliens) {
+        if (!alien.alive) continue;
+        ctx.fillRect(alien.x, alien.y, alien.w, alien.h);
+        ctx.fillRect(alien.x + 8, alien.y - 6, alien.w - 16, 6);
+      }
+    }
+
+    function drawBullets() {
+      ctx.fillStyle = colors.bullet;
+      for (const bullet of state.bullets) {
+        ctx.fillRect(bullet.x, bullet.y, 4, 12);
+      }
+    }
+
+    function drawBackground() {
+      ctx.fillStyle = colors.bgStars;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+      for (let i = 0; i < 40; i++) {
+        const size = Math.random() * 2;
+        ctx.fillRect(Math.random() * canvas.width, Math.random() * canvas.height, size, size);
+      }
+    }
+
+    function drawOverlay() {
+      ctx.fillStyle = colors.text;
+      ctx.font = "20px 'Noto Sans JP', sans-serif";
+      ctx.textAlign = "center";
+      if (state.win) {
+        ctx.fillText("完全勝利！ Enter で再挑戦", canvas.width / 2, canvas.height / 2);
+      } else if (state.gameOver) {
+        ctx.fillText("ゲームオーバー… Enter で再挑戦", canvas.width / 2, canvas.height / 2);
+      }
+    }
+
+    function movePlayer(delta) {
+      if (keys.has("ArrowLeft")) state.player.x -= state.player.speed * delta;
+      if (keys.has("ArrowRight")) state.player.x += state.player.speed * delta;
+      state.player.x = Math.max(10, Math.min(canvas.width - state.player.w - 10, state.player.x));
+    }
+
+    function shoot(timestamp) {
+      const cooldown = 320;
+      if (!keys.has(" ") && !keys.has("Space")) return;
+      if (timestamp - state.lastShot < cooldown) return;
+
+      state.bullets.push({ x: state.player.x + state.player.w / 2 - 2, y: state.player.y - 12 });
+      state.lastShot = timestamp;
+    }
+
+    function moveBullets(delta) {
+      const speed = 9 * delta;
+      for (const bullet of state.bullets) {
+        bullet.y -= speed;
+      }
+      state.bullets = state.bullets.filter((b) => b.y + 12 > 0);
+    }
+
+    function moveAliens(delta) {
+      let hitEdge = false;
+      const aliveAliens = state.aliens.filter((a) => a.alive);
+      for (const alien of aliveAliens) {
+        alien.x += state.alienDir * state.alienSpeed * delta * 60;
+        if (alien.x <= 20 || alien.x + alien.w >= canvas.width - 20) {
+          hitEdge = true;
+        }
+      }
+
+      if (hitEdge) {
+        state.alienDir *= -1;
+        for (const alien of aliveAliens) {
+          alien.y += 18;
+        }
+        state.alienSpeed *= 1.05;
+      }
+    }
+
+    function handleCollisions() {
+      for (const bullet of state.bullets) {
+        for (const alien of state.aliens) {
+          if (!alien.alive) continue;
+          if (
+            bullet.x < alien.x + alien.w &&
+            bullet.x + 4 > alien.x &&
+            bullet.y < alien.y + alien.h &&
+            bullet.y + 12 > alien.y
+          ) {
+            alien.alive = false;
+            bullet.y = -100;
+            state.score += 50;
+            updateScore();
+          }
+        }
+      }
+
+      const firstAlive = state.aliens.find((a) => a.alive);
+      if (firstAlive && firstAlive.y + firstAlive.h >= state.player.y) {
+        state.gameOver = true;
+      }
+
+      if (state.aliens.every((a) => !a.alive)) {
+        state.win = true;
+      }
+    }
+
+    function update(timestamp) {
+      const delta = Math.min((timestamp - state.lastFrame) / 16, 3);
+      state.lastFrame = timestamp;
+
+      if (!state.gameOver && !state.win) {
+        movePlayer(delta);
+        shoot(timestamp);
+        moveBullets(delta);
+        moveAliens(delta);
+        handleCollisions();
+      }
+
+      drawBackground();
+      drawAliens();
+      drawPlayer();
+      drawBullets();
+      drawOverlay();
+
+      requestAnimationFrame(update);
+    }
+
+    window.addEventListener("keydown", (e) => {
+      keys.add(e.key);
+      if ((state.gameOver || state.win) && e.key === "Enter") {
+        resetGame();
+      }
+    });
+
+    window.addEventListener("keyup", (e) => keys.delete(e.key));
+
+    resetGame();
+    requestAnimationFrame(update);
+  </script>
+</body>
+</html>
